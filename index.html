@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
-<meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Creatina"/>
+<meta name="theme-color" content="#0D0D0F"/>
+<link rel="manifest" href="manifest.json"/>
 <title>Creatina</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@400;500&display=swap');
@@ -26,7 +28,6 @@ body{display:flex;justify-content:center;min-height:100vh;overflow-x:hidden;}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:52px 28px 0;}
 .topbar-title{font-size:12px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--text-mid);}
 .settings-btn{width:36px;height:36px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:18px;transition:all .2s;line-height:1;}
-.settings-btn:hover{border-color:var(--border-hi);color:var(--text);}
 
 .alert-banner{margin:20px 20px 0;background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.18);border-radius:14px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;}
 .alert-dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);flex-shrink:0;margin-top:5px;animation:pdot 1.5s infinite;}
@@ -34,13 +35,15 @@ body{display:flex;justify-content:center;min-height:100vh;overflow-x:hidden;}
 .alert-text{font-size:13px;color:var(--text);line-height:1.5;}
 .alert-text strong{color:var(--cyan);}
 
+.info-card{margin:20px 20px 0;background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.15);border-radius:16px;padding:16px 18px;}
+.info-title{font-size:13px;font-weight:700;color:var(--cyan);margin-bottom:6px;}
+.info-text{font-size:12px;color:var(--text-mid);line-height:1.6;}
+
 .perm-card{margin:20px 20px 0;background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.15);border-radius:16px;padding:18px;display:flex;gap:14px;align-items:flex-start;}
 .perm-icon{font-size:22px;flex-shrink:0;margin-top:2px;}
 .perm-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;}
 .perm-sub{font-size:12px;color:var(--text-mid);line-height:1.5;margin-bottom:12px;}
 .perm-btn{padding:8px 18px;background:var(--cyan);color:#000;border:none;border-radius:8px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;}
-
-.no-support{margin:20px 20px 0;background:var(--red-dim);border:1px solid rgba(255,59,92,.2);border-radius:12px;padding:12px 16px;font-size:12px;color:var(--red);line-height:1.5;}
 
 .main-card{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 28px 40px;text-align:center;}
 .streak-label{font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--text-mid);margin-bottom:12px;}
@@ -101,8 +104,7 @@ body{display:flex;justify-content:center;min-height:100vh;overflow-x:hidden;}
 .toggle input:checked ~ .toggle-track{background:var(--cyan);border-color:var(--cyan);}
 .toggle-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .25s;box-shadow:0 1px 4px rgba(0,0,0,.4);}
 .toggle input:checked ~ .toggle-thumb{transform:translateX(18px);}
-.save-btn{width:100%;padding:16px;background:var(--cyan);color:#000;border:none;border-radius:12px;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;transition:filter .2s;}
-.save-btn:hover{filter:brightness(1.1);}
+.save-btn{width:100%;padding:16px;background:var(--cyan);color:#000;border:none;border-radius:12px;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;}
 .save-btn:active{transform:scale(.98);}
 
 #toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:#1C1C21;color:#F0F0F5;padding:10px 20px;border-radius:40px;font-size:13px;font-weight:500;font-family:'Syne',sans-serif;border:1px solid rgba(255,255,255,.1);z-index:999;transition:opacity .3s;opacity:0;pointer-events:none;white-space:nowrap;}
@@ -113,6 +115,53 @@ body{display:flex;justify-content:center;min-height:100vh;overflow-x:hidden;}
 <div id="app"></div>
 <div id="toast"></div>
 <script>
+/* ===== INLINE SERVICE WORKER ===== */
+/* We register a SW from a blob so no extra file is needed */
+function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  var swCode = [
+    'var CACHE = "creatina-v1";',
+    'self.addEventListener("install", function(e) { self.skipWaiting(); });',
+    'self.addEventListener("activate", function(e) { e.waitUntil(self.clients.claim()); });',
+    'self.addEventListener("notificationclick", function(e) {',
+    '  e.notification.close();',
+    '  e.waitUntil(clients.matchAll({type:"window"}).then(function(list) {',
+    '    for (var i = 0; i < list.length; i++) {',
+    '      if (list[i].url && "focus" in list[i]) { list[i].focus(); list[i].postMessage("taken"); return; }',
+    '    }',
+    '    if (clients.openWindow) return clients.openWindow("/");',
+    '  }));',
+    '});',
+    'self.addEventListener("message", function(e) {',
+    '  if (e.data && e.data.type === "SCHEDULE") {',
+    '    var delay = e.data.delay;',
+    '    var title = e.data.title;',
+    '    var body = e.data.body;',
+    '    var tag = e.data.tag;',
+    '    setTimeout(function() {',
+    '      self.registration.showNotification(title, {',
+    '        body: body, tag: tag, renotify: true, requireInteraction: true',
+    '      });',
+    '    }, delay);',
+    '  }',
+    '});'
+  ].join('\n');
+
+  var blob = new Blob([swCode], {type: 'application/javascript'});
+  var swUrl = URL.createObjectURL(blob);
+
+  navigator.serviceWorker.register(swUrl).then(function(reg) {
+    console.log('SW registered');
+    // Listen for messages from SW (notif clicked)
+    navigator.serviceWorker.addEventListener('message', function(e) {
+      if (e.data === 'taken') { markAsTaken(); }
+    });
+  }).catch(function(e) {
+    console.log('SW failed (blob SW requires HTTPS or localhost):', e.message);
+  });
+}
+
+/* ===== STATE ===== */
 var DEFAULT_CONFIG = {hour:'09:00',dose:'5g',name:'',notificationsEnabled:true};
 var config = {hour:'09:00',dose:'5g',name:'',notificationsEnabled:true};
 var todayData = null;
@@ -122,381 +171,393 @@ var reminderTimer = null;
 var panelOpen = false;
 var toastTimer = null;
 
-function loadAll(){
-  try{var c=localStorage.getItem('creatina:config');if(c){var parsed=JSON.parse(c);config=Object.assign({},DEFAULT_CONFIG,parsed);}}catch(e){}
-  try{var t=localStorage.getItem('creatina:today');if(t)todayData=JSON.parse(t);}catch(e){}
-  try{var s=localStorage.getItem('creatina:streak');if(s)streak=parseInt(s,10)||0;}catch(e){}
+/* ===== STORAGE ===== */
+function loadAll() {
+  try { var c = localStorage.getItem('creatina:config'); if(c) config = Object.assign({}, DEFAULT_CONFIG, JSON.parse(c)); } catch(e) {}
+  try { var t = localStorage.getItem('creatina:today'); if(t) todayData = JSON.parse(t); } catch(e) {}
+  try { var s = localStorage.getItem('creatina:streak'); if(s) streak = parseInt(s,10) || 0; } catch(e) {}
+  // Reset todayData if it's from a previous day
+  if (todayData && todayData.date !== todayStr()) { todayData = null; }
 }
 
-function saveConfig(){try{localStorage.setItem('creatina:config',JSON.stringify(config));}catch(e){}}
-function saveTodayData(){try{localStorage.setItem('creatina:today',JSON.stringify(todayData));}catch(e){}}
-function saveStreak(){try{localStorage.setItem('creatina:streak',String(streak));localStorage.setItem('creatina:lastDate',todayStr());}catch(e){}}
-
-function todayStr(){return new Date().toISOString().slice(0,10);}
-
-function fmtTime(d){
-  var h=d.getHours(),m=d.getMinutes();
-  return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+function saveConfig() { try { localStorage.setItem('creatina:config', JSON.stringify(config)); } catch(e) {} }
+function saveTodayData() { try { localStorage.setItem('creatina:today', JSON.stringify(todayData)); } catch(e) {} }
+function saveStreak() {
+  try {
+    localStorage.setItem('creatina:streak', String(streak));
+    localStorage.setItem('creatina:lastDate', todayStr());
+  } catch(e) {}
 }
 
-function isTakenToday(){
-  return todayData!==null&&todayData.date===todayStr()&&todayData.taken===true;
+/* ===== UTILS ===== */
+function todayStr() { return new Date().toISOString().slice(0,10); }
+
+function fmtTime(d) {
+  var h = d.getHours(), m = d.getMinutes();
+  return (h<10?'0':'') + h + ':' + (m<10?'0':'') + m;
 }
 
-function getNextNotifTime(){
-  var parts=config.hour.split(':');
-  var h=parseInt(parts[0],10),m=parseInt(parts[1],10);
-  var now=new Date();
-  var target=new Date();
-  target.setHours(h,m,0,0);
-  if(target<=now)target.setDate(target.getDate()+1);
+function isTakenToday() {
+  return todayData !== null && todayData.date === todayStr() && todayData.taken === true;
+}
+
+function getNextNotifTime() {
+  var parts = config.hour.split(':');
+  var h = parseInt(parts[0],10), m = parseInt(parts[1],10);
+  var target = new Date();
+  target.setHours(h, m, 0, 0);
+  if (target.getTime() <= Date.now()) target.setDate(target.getDate()+1);
   return target;
 }
 
-function msUntilNotif(){return getNextNotifTime().getTime()-Date.now();}
+function msUntilNotif() { return getNextNotifTime().getTime() - Date.now(); }
 
-function fmtNextNotif(){
-  var diff=getNextNotifTime().getTime()-Date.now();
-  var h=Math.floor(diff/3600000);
-  var m=Math.floor((diff%3600000)/60000);
-  if(h>0)return 'prox. en '+h+'h '+m+'m';
-  return 'prox. en '+m+'m';
+function fmtNextNotif() {
+  var diff = getNextNotifTime().getTime() - Date.now();
+  var h = Math.floor(diff / 3600000);
+  var m = Math.floor((diff % 3600000) / 60000);
+  if (h > 0) return 'prox. en ' + h + 'h ' + m + 'm';
+  return 'prox. en ' + m + 'm';
 }
 
-function getStreakState(){
-  if(isTakenToday())return 'done';
-  var last=localStorage.getItem('creatina:lastDate');
-  if(!last||streak===0)return 'pending';
-  var yesterday=new Date();
-  yesterday.setDate(yesterday.getDate()-1);
-  var yStr=yesterday.toISOString().slice(0,10);
-  if(last!==todayStr()&&last!==yStr)return 'broken';
+function getStreakState() {
+  if (isTakenToday()) return 'done';
+  var last = localStorage.getItem('creatina:lastDate');
+  if (!last || streak === 0) return 'pending';
+  var yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  var yStr = yesterday.toISOString().slice(0,10);
+  if (last !== todayStr() && last !== yStr) return 'broken';
   return 'pending';
 }
 
-function getWeekCount(){
-  var count=0;
-  for(var i=0;i<7;i++){
-    var d=new Date();d.setDate(d.getDate()-i);
-    if(localStorage.getItem('creatina:day:'+d.toISOString().slice(0,10))==='1')count++;
+function getWeekCount() {
+  var count = 0;
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(); d.setDate(d.getDate()-i);
+    if (localStorage.getItem('creatina:day:' + d.toISOString().slice(0,10)) === '1') count++;
   }
   return count;
 }
 
-function getBestStreak(){
-  try{return parseInt(localStorage.getItem('creatina:best')||'0',10)||0;}catch(e){return 0;}
+function getBestStreak() {
+  try { return parseInt(localStorage.getItem('creatina:best') || '0', 10) || 0; } catch(e) { return 0; }
 }
 
-function updateStreak(){
-  var last=localStorage.getItem('creatina:lastDate');
-  if(!last)return;
-  var yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);
-  var yStr=yesterday.toISOString().slice(0,10);
-  if(last!==todayStr()&&last!==yStr){streak=0;saveStreak();}
+/* ===== STREAK ===== */
+function updateStreak() {
+  var last = localStorage.getItem('creatina:lastDate');
+  if (!last) return;
+  var yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  var yStr = yesterday.toISOString().slice(0,10);
+  if (last !== todayStr() && last !== yStr) { streak = 0; saveStreak(); }
 }
 
-function notifSupported(){return 'Notification' in window;}
-function notifGranted(){return notifSupported()&&Notification.permission==='granted';}
+/* ===== NOTIFICATIONS ===== */
+function notifSupported() { return 'Notification' in window; }
+function notifGranted() { return notifSupported() && Notification.permission === 'granted'; }
 
-function requestPermission(){
-  if(!notifSupported())return;
-  Notification.requestPermission().then(function(perm){
+function requestPermission() {
+  if (!notifSupported()) return;
+  var p = Notification.requestPermission(function(perm) {
     renderUI();
-    if(perm==='granted'){scheduleNotification();showToast('Notificaciones activadas!');}
-  }).catch(function(){
-    Notification.requestPermission(function(perm){
-      renderUI();
-      if(perm==='granted'){scheduleNotification();showToast('Notificaciones activadas!');}
-    });
+    if (perm === 'granted') { scheduleNotification(); showToast('Notificaciones activadas!'); }
   });
+  if (p && p.then) {
+    p.then(function(perm) {
+      renderUI();
+      if (perm === 'granted') { scheduleNotification(); showToast('Notificaciones activadas!'); }
+    });
+  }
 }
 
-function buildIcon(){
-  try{
-    var c=document.createElement('canvas');c.width=128;c.height=128;
-    var ctx=c.getContext('2d');
-    ctx.fillStyle='#0D0D0F';ctx.beginPath();ctx.arc(64,64,64,0,Math.PI*2);ctx.fill();
-    ctx.font='72px serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('\uD83E\uDDEA',64,68);
-    return c.toDataURL();
-  }catch(e){return '';}
+/* Schedule via SW (survives app close) + setTimeout fallback */
+function scheduleViaServiceWorker(delayMs, title, body, tag) {
+  if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return false;
+  try {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SCHEDULE', delay: delayMs, title: title, body: body, tag: tag
+    });
+    return true;
+  } catch(e) { return false; }
 }
 
-function fireNotification(title,body,tag){
-  if(!notifGranted()||!config.notificationsEnabled)return;
-  try{
-    var opts={body:body,tag:tag||'creatina',renotify:true,requireInteraction:true,icon:buildIcon()};
-    var n=new Notification(title,opts);
-    n.onclick=function(){window.focus();n.close();markAsTaken();};
-  }catch(e){}
-}
+function scheduleNotification() {
+  clearTimeout(notifTimer); clearTimeout(reminderTimer);
+  if (!config.notificationsEnabled || !notifGranted() || isTakenToday()) return;
 
-function scheduleNotification(){
-  clearTimeout(notifTimer);clearTimeout(reminderTimer);
-  if(!config.notificationsEnabled||!notifGranted()||isTakenToday())return;
-  var ms=msUntilNotif();
-  notifTimer=setTimeout(function(){
-    if(!isTakenToday()){
-      fireNotification(
-        'Ya tomaste tu creatina?',
-        'Lleva solo 5 segundos. No rompas tu racha de '+streak+' dias.',
-        'creatina-main'
-      );
-      reminderTimer=setTimeout(function(){
-        if(!isTakenToday()){
-          fireNotification(
-            'Creatina pendiente',
-            'Han pasado 30 minutos. No pierdas tu racha!',
-            'creatina-reminder'
-          );
-        }
-      },30*60*1000);
-    }
-  },ms);
-}
+  var ms = msUntilNotif();
+  var mainTitle = 'Ya tomaste tu creatina?';
+  var mainBody = 'Lleva solo 5 segundos. Racha: ' + streak + ' dias.';
+  var remBody = 'Han pasado 30 minutos. No pierdas la racha!';
 
-function markAsTaken(){
-  if(isTakenToday())return;
-  var now=new Date();
-  todayData={date:todayStr(),time:fmtTime(now),taken:true};
-  var last=localStorage.getItem('creatina:lastDate');
-  var yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);
-  var yStr=yesterday.toISOString().slice(0,10);
-  if(last===yStr||last===todayStr()){streak=streak+1;}else{streak=1;}
-  var best=getBestStreak();
-  if(streak>best){try{localStorage.setItem('creatina:best',String(streak));}catch(e){}}
-  try{localStorage.setItem('creatina:day:'+todayStr(),'1');}catch(e){}
-  saveTodayData();saveStreak();
-  clearTimeout(notifTimer);clearTimeout(reminderTimer);
-  renderUI();spawnParticles();
-  showToast('+'+config.dose+' registrado!');
-}
-
-function checkMissedOnOpen(){
-  if(isTakenToday()||!notifGranted()||!config.notificationsEnabled)return;
-  var parts=config.hour.split(':');
-  var h=parseInt(parts[0],10),m=parseInt(parts[1],10);
-  var sched=new Date();sched.setHours(h,m,0,0);
-  if(Date.now()>sched.getTime()){
-    setTimeout(function(){
-      if(!isTakenToday()){
-        fireNotification('Creatina pendiente','Son las '+fmtTime(new Date())+' y tu creatina sigue pendiente!','creatina-open');
+  // Try SW first, fall back to setTimeout
+  var swOk = scheduleViaServiceWorker(ms, mainTitle, mainBody, 'creatina-main');
+  if (!swOk) {
+    notifTimer = setTimeout(function() {
+      if (!isTakenToday()) {
+        showLocalNotif(mainTitle, mainBody, 'creatina-main');
+        reminderTimer = setTimeout(function() {
+          if (!isTakenToday()) showLocalNotif('Creatina pendiente', remBody, 'creatina-reminder');
+        }, 30*60*1000);
       }
-    },2000);
+    }, ms);
   }
 }
 
-function showToast(msg){
-  var t=document.getElementById('toast');if(!t)return;
-  t.textContent=msg;t.style.opacity='1';
+function showLocalNotif(title, body, tag) {
+  if (!notifGranted() || !config.notificationsEnabled) return;
+  try {
+    var n = new Notification(title, {body:body, tag:tag, renotify:true, requireInteraction:true});
+    n.onclick = function() { window.focus(); n.close(); markAsTaken(); };
+  } catch(e) {}
+}
+
+/* ===== ACTIONS ===== */
+function markAsTaken() {
+  if (isTakenToday()) return;
+  var now = new Date();
+  todayData = {date: todayStr(), time: fmtTime(now), taken: true};
+  var last = localStorage.getItem('creatina:lastDate');
+  var yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  var yStr = yesterday.toISOString().slice(0,10);
+  streak = (last === yStr || last === todayStr()) ? streak + 1 : 1;
+  var best = getBestStreak();
+  if (streak > best) { try { localStorage.setItem('creatina:best', String(streak)); } catch(e) {} }
+  try { localStorage.setItem('creatina:day:' + todayStr(), '1'); } catch(e) {}
+  saveTodayData(); saveStreak();
+  clearTimeout(notifTimer); clearTimeout(reminderTimer);
+  renderUI(); spawnParticles();
+  showToast('+' + config.dose + ' registrado!');
+}
+
+function checkOnOpen() {
+  if (isTakenToday() || !notifGranted() || !config.notificationsEnabled) return;
+  var parts = config.hour.split(':');
+  var sched = new Date(); sched.setHours(parseInt(parts[0],10), parseInt(parts[1],10), 0, 0);
+  if (Date.now() > sched.getTime()) {
+    setTimeout(function() {
+      if (!isTakenToday()) showLocalNotif('Creatina pendiente!', 'Son las ' + fmtTime(new Date()) + '. No olvides tu creatina hoy!', 'creatina-open');
+    }, 1500);
+  }
+}
+
+/* ===== UI ===== */
+function showToast(msg) {
+  var t = document.getElementById('toast'); if (!t) return;
+  t.textContent = msg; t.style.opacity = '1';
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(function(){t.style.opacity='0';},2400);
+  toastTimer = setTimeout(function() { t.style.opacity = '0'; }, 2400);
 }
 
-function addRipple(e,el){
-  var r=document.createElement('div');r.className='ripple';
-  var rect=el.getBoundingClientRect();
-  var size=Math.max(rect.width,rect.height)*2;
-  r.style.width=size+'px';r.style.height=size+'px';
-  r.style.left=(e.clientX-rect.left-size/2)+'px';
-  r.style.top=(e.clientY-rect.top-size/2)+'px';
+function addRipple(e, el) {
+  var r = document.createElement('div'); r.className = 'ripple';
+  var rect = el.getBoundingClientRect();
+  var size = Math.max(rect.width, rect.height) * 2;
+  r.style.width = size + 'px'; r.style.height = size + 'px';
+  r.style.left = (e.clientX - rect.left - size/2) + 'px';
+  r.style.top = (e.clientY - rect.top - size/2) + 'px';
   el.appendChild(r);
-  r.addEventListener('animationend',function(){r.parentNode&&r.parentNode.removeChild(r);});
+  r.addEventListener('animationend', function() { if (r.parentNode) r.parentNode.removeChild(r); });
 }
 
-function spawnParticles(){
-  var btn=document.getElementById('cta-btn');if(!btn)return;
-  var rect=btn.getBoundingClientRect();
-  var cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
-  var colors=['#B8FF00','#00E5FF','#FFFFFF'];
-  for(var i=0;i<18;i++){
-    var p=document.createElement('div');p.className='particle';
-    var angle=(Math.PI*2*i)/18+(Math.random()-.5)*.5;
-    var dist=60+Math.random()*80;
-    var size=4+Math.random()*6;
-    p.style.left=cx+'px';p.style.top=cy+'px';
-    p.style.width=size+'px';p.style.height=size+'px';
-    p.style.background=colors[Math.floor(Math.random()*colors.length)];
-    p.style.setProperty('--tx',Math.cos(angle)*dist+'px');
-    p.style.setProperty('--ty',Math.sin(angle)*dist+'px');
-    p.style.zIndex='999';
+function spawnParticles() {
+  var btn = document.getElementById('cta-btn'); if (!btn) return;
+  var rect = btn.getBoundingClientRect();
+  var cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+  var colors = ['#B8FF00','#00E5FF','#FFFFFF'];
+  for (var i = 0; i < 18; i++) {
+    var p = document.createElement('div'); p.className = 'particle';
+    var angle = (Math.PI*2*i)/18 + (Math.random()-.5)*.5;
+    var dist = 60 + Math.random()*80, size = 4 + Math.random()*6;
+    p.style.left = cx+'px'; p.style.top = cy+'px';
+    p.style.width = size+'px'; p.style.height = size+'px';
+    p.style.background = colors[Math.floor(Math.random()*colors.length)];
+    p.style.setProperty('--tx', Math.cos(angle)*dist+'px');
+    p.style.setProperty('--ty', Math.sin(angle)*dist+'px');
+    p.style.zIndex = '999';
     document.body.appendChild(p);
-    p.addEventListener('animationend',function(){this.parentNode&&this.parentNode.removeChild(this);});
+    p.addEventListener('animationend', function() { if (this.parentNode) this.parentNode.removeChild(this); });
   }
 }
 
-function openPanel(){panelOpen=true;renderUI();}
-function closePanel(){panelOpen=false;renderUI();}
+function handleCtaClick(e) {
+  var btn = document.getElementById('cta-btn');
+  if (btn) addRipple(e, btn);
+  setTimeout(markAsTaken, 80);
+}
 
-function setDose(d){
-  config.dose=d;
-  var chips=document.querySelectorAll('.dose-chip');
-  for(var i=0;i<chips.length;i++){
-    if(chips[i].getAttribute('data-dose')===d){chips[i].classList.add('active');}
-    else{chips[i].classList.remove('active');}
+/* ===== SETTINGS ===== */
+function openPanel() { panelOpen = true; renderUI(); }
+function closePanel() { panelOpen = false; renderUI(); }
+
+function setDose(d) {
+  config.dose = d;
+  var chips = document.querySelectorAll('.dose-chip');
+  for (var i = 0; i < chips.length; i++) {
+    chips[i].className = 'dose-chip' + (chips[i].getAttribute('data-dose') === d ? ' active' : '');
   }
 }
 
-function applySettings(){
-  var hEl=document.getElementById('cfg-hour');
-  var nEl=document.getElementById('cfg-name');
-  var tEl=document.getElementById('cfg-toggle');
-  if(hEl)config.hour=hEl.value;
-  if(nEl)config.name=nEl.value;
-  if(tEl)config.notificationsEnabled=tEl.checked;
-  saveConfig();scheduleNotification();closePanel();showToast('Guardado!');
+function applySettings() {
+  var hEl = document.getElementById('cfg-hour');
+  var nEl = document.getElementById('cfg-name');
+  var tEl = document.getElementById('cfg-toggle');
+  if (hEl) config.hour = hEl.value;
+  if (nEl) config.name = nEl.value;
+  if (tEl) config.notificationsEnabled = tEl.checked;
+  saveConfig(); scheduleNotification(); closePanel(); showToast('Guardado!');
 }
 
-function handleCtaClick(e){
-  var btn=document.getElementById('cta-btn');
-  if(btn)addRipple(e,btn);
-  setTimeout(markAsTaken,80);
-}
-
-/* BUILD HTML */
-function buildPanel(){
-  var chips='';
-  var doses=['3g','5g','10g'];
-  for(var i=0;i<doses.length;i++){
-    var d=doses[i];
-    chips+='<button class="dose-chip'+(config.dose===d?' active':'')+'" data-dose="'+d+'" onclick="setDose(\''+d+'\')">'+d+'</button>';
+/* ===== BUILD HTML ===== */
+function buildPanel() {
+  var chips = '';
+  var doses = ['3g','5g','10g'];
+  for (var i = 0; i < doses.length; i++) {
+    var d = doses[i];
+    chips += '<button class="dose-chip' + (config.dose===d?' active':'') + '" data-dose="' + d + '" onclick="setDose(\'' + d + '\')">' + d + '</button>';
   }
-  return '<div class="overlay'+(panelOpen?' open':'')+'" onclick="closePanel()"></div>'+
-    '<div class="panel'+(panelOpen?' open':'')+'">'+
-      '<div class="panel-handle"></div>'+
-      '<div class="panel-head">'+
-        '<div class="panel-title">Configuracion</div>'+
-        '<button class="panel-close" onclick="closePanel()">&#x2715;</button>'+
-      '</div>'+
-      '<div class="panel-body">'+
-        '<div class="field-row"><label class="field-lbl">Tu nombre</label>'+
-        '<input id="cfg-name" class="field-input" placeholder="Opcional" value="'+config.name+'" /></div>'+
-        '<div class="field-row"><label class="field-lbl">Hora del recordatorio</label>'+
-        '<input id="cfg-hour" class="field-input" type="time" value="'+config.hour+'" /></div>'+
-        '<div class="field-row"><label class="field-lbl">Dosis diaria</label>'+
-        '<div class="chip-row">'+chips+'</div></div>'+
-        '<div class="toggle-row"><span class="toggle-label">Notificaciones activas</span>'+
-        '<label class="toggle"><input type="checkbox" id="cfg-toggle"'+(config.notificationsEnabled?' checked':'')+' />'+
-        '<div class="toggle-track"></div><div class="toggle-thumb"></div></label></div>'+
-        '<button class="save-btn" onclick="applySettings()">Guardar cambios</button>'+
-      '</div>'+
-    '</div>';
+  return '<div class="overlay' + (panelOpen?' open':'') + '" onclick="closePanel()"></div>' +
+    '<div class="panel' + (panelOpen?' open':'') + '">' +
+      '<div class="panel-handle"></div>' +
+      '<div class="panel-head"><div class="panel-title">Configuracion</div>' +
+      '<button class="panel-close" onclick="closePanel()">&#x2715;</button></div>' +
+      '<div class="panel-body">' +
+        '<div class="field-row"><label class="field-lbl">Tu nombre</label>' +
+        '<input id="cfg-name" class="field-input" placeholder="Opcional" value="' + config.name + '" /></div>' +
+        '<div class="field-row"><label class="field-lbl">Hora del recordatorio</label>' +
+        '<input id="cfg-hour" class="field-input" type="time" value="' + config.hour + '" /></div>' +
+        '<div class="field-row"><label class="field-lbl">Dosis diaria</label>' +
+        '<div class="chip-row">' + chips + '</div></div>' +
+        '<div class="toggle-row"><span class="toggle-label">Notificaciones activas</span>' +
+        '<label class="toggle"><input type="checkbox" id="cfg-toggle"' + (config.notificationsEnabled?' checked':'') + ' />' +
+        '<div class="toggle-track"></div><div class="toggle-thumb"></div></label></div>' +
+        '<button class="save-btn" onclick="applySettings()">Guardar cambios</button>' +
+      '</div></div>';
 }
 
-function buildBanners(){
-  var html='';
-  var last=localStorage.getItem('creatina:lastDate');
-  if(!isTakenToday()&&last&&last!==todayStr()){
-    var yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);
-    if(last!==yesterday.toISOString().slice(0,10)){
-      html+='<div class="alert-banner">'+
-        '<div class="alert-dot"></div>'+
-        '<div class="alert-text">Llevas varios dias sin registrar. <strong>Tu racha corre peligro.</strong> Tomala ahora.</div>'+
-      '</div>';
+function buildBanners() {
+  var html = '';
+  // Missed multiple days banner
+  var last = localStorage.getItem('creatina:lastDate');
+  if (!isTakenToday() && last && last !== todayStr()) {
+    var yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+    if (last !== yesterday.toISOString().slice(0,10)) {
+      html += '<div class="alert-banner"><div class="alert-dot"></div>' +
+        '<div class="alert-text">Llevas varios dias sin registrar. <strong>Tomala ahora.</strong></div></div>';
     }
   }
-  if(notifSupported()&&!notifGranted()&&Notification.permission!=='denied'){
-    html+='<div class="perm-card">'+
-      '<div class="perm-icon">\uD83D\uDD14</div>'+
-      '<div><div class="perm-title">Activar recordatorios</div>'+
-      '<div class="perm-sub">Te avisamos a las '+config.hour+' si no tomaste tu creatina.</div>'+
-      '<button class="perm-btn" onclick="requestPermission()">Activar</button></div>'+
-    '</div>';
+  // iOS PWA instructions if not installed
+  var isStandalone = window.navigator.standalone === true;
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (isIOS && !isStandalone) {
+    html += '<div class="info-card">' +
+      '<div class="info-title">Para recibir notificaciones en iPhone</div>' +
+      '<div class="info-text">1. Toca el boton compartir de Safari &#9650;<br>' +
+      '2. Toca "Anadir a pantalla de inicio"<br>' +
+      '3. Abre la app desde el icono del escritorio<br>' +
+      '4. Activa las notificaciones desde ahi</div></div>';
   }
-  if(!notifSupported()){
-    html+='<div class="no-support">Las notificaciones no estan disponibles en este navegador. Usa Chrome para activarlas.</div>';
+  // Notif permission
+  if (notifSupported() && !notifGranted() && Notification.permission !== 'denied') {
+    html += '<div class="perm-card"><div class="perm-icon">\uD83D\uDD14</div><div>' +
+      '<div class="perm-title">Activar recordatorios</div>' +
+      '<div class="perm-sub">Te avisamos a las ' + config.hour + ' si no tomaste tu creatina.</div>' +
+      '<button class="perm-btn" onclick="requestPermission()">Activar</button>' +
+      '</div></div>';
   }
   return html;
 }
 
-function buildMain(){
-  var state=getStreakState();
-  var colClass=state==='done'?'col-done':state==='broken'?'col-broken':'col-pending';
-  var glowClass=state==='done'?'glow-done':state==='broken'?'glow-broken':'glow-pending';
-  var label=state==='broken'?'RACHA ROTA':'RACHA ACTUAL';
-  var unit=streak===1?'dia seguido':'dias seguidos';
+function buildMain() {
+  var state = getStreakState();
+  var colClass = state==='done' ? 'col-done' : state==='broken' ? 'col-broken' : 'col-pending';
+  var glowClass = state==='done' ? 'glow-done' : state==='broken' ? 'glow-broken' : 'glow-pending';
+  var label = state==='broken' ? 'RACHA ROTA' : 'RACHA ACTUAL';
+  var unit = streak===1 ? 'dia seguido' : 'dias seguidos';
 
-  var statusLine='';
-  if(state==='done'){
-    var t=todayData&&todayData.time?todayData.time:'--:--';
-    statusLine='<div class="status-line">Registrado hoy a las <strong>'+t+'</strong></div>';
-  }else if(state==='broken'){
-    statusLine='<div class="status-line" style="color:var(--red)">Racha <strong style="color:var(--red)">rota</strong>. Hoy empiezas de nuevo.</div>';
-  }else{
-    var nameStr=config.name?', '+config.name:'';
-    statusLine='<div class="status-line">Hoy aun no'+nameStr+'. '+config.dose+' te esperan.</div>';
+  var statusLine = '';
+  if (state === 'done') {
+    var t = todayData && todayData.time ? todayData.time : '--:--';
+    statusLine = '<div class="status-line">Registrado hoy a las <strong>' + t + '</strong></div>';
+  } else if (state === 'broken') {
+    statusLine = '<div class="status-line" style="color:var(--red)">Racha <strong style="color:var(--red)">rota</strong>. Hoy empiezas de nuevo.</div>';
+  } else {
+    var nameStr = config.name ? ', ' + config.name : '';
+    statusLine = '<div class="status-line">Hoy aun no' + nameStr + '. ' + config.dose + ' te esperan.</div>';
   }
 
-  var nextLine='';
-  if(notifGranted()&&config.notificationsEnabled&&!isTakenToday()){
-    nextLine='<div class="next-notif">'+fmtNextNotif()+'</div>';
+  var nextLine = '';
+  if (notifGranted() && config.notificationsEnabled && !isTakenToday()) {
+    nextLine = '<div class="next-notif">' + fmtNextNotif() + '</div>';
   }
 
-  var ctaBtn='';
-  if(state==='done'){
-    ctaBtn='<button class="cta-btn cta-done" id="cta-btn"><span class="check-anim">&#10003;</span> Tomada hoy</button>';
-  }else{
-    ctaBtn='<button class="cta-btn cta-pending" id="cta-btn" onclick="handleCtaClick(event)">Marcar como tomada</button>';
-  }
+  var ctaBtn = state === 'done'
+    ? '<button class="cta-btn cta-done" id="cta-btn"><span class="check-anim">&#10003;</span> Tomada hoy</button>'
+    : '<button class="cta-btn cta-pending" id="cta-btn" onclick="handleCtaClick(event)">Marcar como tomada</button>';
 
-  return '<div class="main-card">'+
-    '<div class="streak-label">'+label+'</div>'+
-    '<div class="streak-wrap">'+
-      '<div class="glow-ring '+glowClass+'"></div>'+
-      '<div class="streak-number '+colClass+'">'+streak+'</div>'+
-    '</div>'+
-    '<div class="streak-unit '+colClass+'">'+unit+'</div>'+
-    statusLine+nextLine+
-    '<div class="cta-wrap">'+ctaBtn+'</div>'+
+  return '<div class="main-card">' +
+    '<div class="streak-label">' + label + '</div>' +
+    '<div class="streak-wrap">' +
+      '<div class="glow-ring ' + glowClass + '"></div>' +
+      '<div class="streak-number ' + colClass + '">' + streak + '</div>' +
+    '</div>' +
+    '<div class="streak-unit ' + colClass + '">' + unit + '</div>' +
+    statusLine + nextLine +
+    '<div class="cta-wrap">' + ctaBtn + '</div>' +
   '</div>';
 }
 
-function buildStats(){
-  var taken=isTakenToday();
-  var week=getWeekCount();
-  var best=Math.max(getBestStreak(),streak);
-  var todayVal=taken?('&#10003; '+config.dose):'Pendiente';
-  var todayClass=taken?'stat-val c-lime':'stat-val c-cyan';
-  var notifVal=(notifGranted()&&config.notificationsEnabled)?config.hour:'--:--';
-
-  return '<div class="bottom-stats">'+
-    '<div class="stat-box"><div class="stat-lbl">Hoy</div><div class="'+todayClass+'">'+todayVal+'</div></div>'+
-    '<div class="stat-box"><div class="stat-lbl">Proximo aviso</div><div class="stat-val" style="font-size:14px">'+notifVal+'</div></div>'+
-    '<div class="stat-box"><div class="stat-lbl">Esta semana</div><div class="stat-val c-cyan">'+week+'/7</div></div>'+
-    '<div class="stat-box"><div class="stat-lbl">Mejor racha</div><div class="stat-val">'+best+'</div></div>'+
+function buildStats() {
+  var taken = isTakenToday();
+  var week = getWeekCount();
+  var best = Math.max(getBestStreak(), streak);
+  var todayVal = taken ? ('&#10003; ' + config.dose) : 'Pendiente';
+  var todayClass = taken ? 'stat-val c-lime' : 'stat-val c-cyan';
+  var notifVal = (notifGranted() && config.notificationsEnabled) ? config.hour : '--:--';
+  return '<div class="bottom-stats">' +
+    '<div class="stat-box"><div class="stat-lbl">Hoy</div><div class="' + todayClass + '">' + todayVal + '</div></div>' +
+    '<div class="stat-box"><div class="stat-lbl">Proximo aviso</div><div class="stat-val" style="font-size:14px">' + notifVal + '</div></div>' +
+    '<div class="stat-box"><div class="stat-lbl">Esta semana</div><div class="stat-val c-cyan">' + week + '/7</div></div>' +
+    '<div class="stat-box"><div class="stat-lbl">Mejor racha</div><div class="stat-val">' + best + '</div></div>' +
   '</div>';
 }
 
-function renderUI(){
-  var app=document.getElementById('app');if(!app)return;
-  app.innerHTML=
-    buildPanel()+
-    '<div class="topbar">'+
-      '<div class="topbar-title">Creatina</div>'+
-      '<button class="settings-btn" onclick="openPanel()">&#9881;</button>'+
-    '</div>'+
-    '<div>'+buildBanners()+'</div>'+
-    buildMain()+
+function renderUI() {
+  var app = document.getElementById('app'); if (!app) return;
+  app.innerHTML =
+    buildPanel() +
+    '<div class="topbar">' +
+      '<div class="topbar-title">Creatina</div>' +
+      '<button class="settings-btn" onclick="openPanel()">&#9881;</button>' +
+    '</div>' +
+    '<div>' + buildBanners() + '</div>' +
+    buildMain() +
     buildStats();
 }
 
-window.handleCtaClick=handleCtaClick;
-window.markAsTaken=markAsTaken;
-window.requestPermission=requestPermission;
-window.openPanel=openPanel;
-window.closePanel=closePanel;
-window.applySettings=applySettings;
-window.setDose=setDose;
+/* ===== GLOBALS ===== */
+window.handleCtaClick = handleCtaClick;
+window.markAsTaken = markAsTaken;
+window.requestPermission = requestPermission;
+window.openPanel = openPanel;
+window.closePanel = closePanel;
+window.applySettings = applySettings;
+window.setDose = setDose;
 
+/* ===== BOOT ===== */
 loadAll();
 updateStreak();
 renderUI();
+registerSW();
 scheduleNotification();
-checkMissedOnOpen();
+checkOnOpen();
 
-setInterval(function(){if(!panelOpen)renderUI();},60000);
-document.addEventListener('visibilitychange',function(){
-  if(document.visibilityState==='visible'){loadAll();updateStreak();renderUI();checkMissedOnOpen();}
+setInterval(function() { if (!panelOpen) { loadAll(); renderUI(); } }, 60000);
+
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible') {
+    loadAll(); updateStreak(); renderUI(); checkOnOpen();
+  }
 });
 </script>
 </body>
